@@ -224,11 +224,17 @@
 
         // --- UTILS ---
         function calculateDistance(lat1, lon1, lat2, lon2) {
+            // Ensure inputs are floats to avoid NaN
+            const p1 = parseFloat(lat1);
+            const p2 = parseFloat(lon1);
+            const p3 = parseFloat(lat2);
+            const p4 = parseFloat(lon2);
+            
             const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const dLat = (p3 - p1) * Math.PI / 180;
+            const dLon = (p4 - p2) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                      Math.cos(p1 * Math.PI / 180) * Math.cos(p3 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return (R * c).toFixed(1);
         }
@@ -245,7 +251,7 @@
             L.marker([lat, lng]).addTo(map).bindPopup("<b>Aapki Location</b>").openPopup();
         }
 
-        // --- SMART SEARCH (FIXED CLICK LOGIC) ---
+        // --- SMART SEARCH ---
         function searchHospitals(query) {
             const box = document.getElementById('suggestionBox');
             const placeholder = document.getElementById('searchPlaceholder');
@@ -287,13 +293,10 @@
                             <div class="small text-muted" style="font-size: 12px;">${hosp.address}</div>
                         `;
 
-                        // FIXED CLICK LOGIC
                         div.onclick = () => {
                             if(hosp.is_registered) {
-                                // Redirects to Partner Info Page
                                 window.location.href = `/patient/hospital-info/${hosp.id}`;
                             } else {
-                                // Google Search for non-partners
                                 let url = `https://www.google.com/search?q=${encodeURIComponent(hosp.name + " " + hosp.address)}`;
                                 window.open(url, '_blank');
                             }
@@ -307,7 +310,7 @@
             });
         }
 
-        // --- SOS POLLING & BROADCAST (FIXED INFO BUTTON) ---
+        // --- SOS POLLING & BROADCAST ---
         function startResponsePolling(sosId, userLat, userLng) {
             if(responsePoller) clearInterval(responsePoller);
             if(userLat && userLng) initMap(userLat, userLng);
@@ -374,12 +377,27 @@
             }
         }
 
+        // FIXED: Added handling for proper redirect after selection
         function selectHospital(sosId, hospId) {
             fetch('/patient/final_selection', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sos_id: sosId, hospital_id: hospId })
-            }).then(() => location.reload());
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    alert("✅ Hospital selected! They are preparing for your arrival.");
+                    location.reload(); 
+                } else {
+                    alert("Selection failed. Please try again.");
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                // If redirect happens during fetch, handle it manually
+                window.location.href = '/patient/home';
+            });
         }
 
         function changeTab(element, sectionId) {
