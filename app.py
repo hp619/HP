@@ -9,7 +9,6 @@ from datetime import timedelta # <--- Naya add kiya session timing ke liye
 app = Flask(__name__, template_folder='templates')
 
 # --- 🔑 SESSION CONFIG (Fix for Logout on Refresh) ---
-# Railway par SECRET_KEY variable set kar dena, nahi toh ye use hoga
 app.secret_key = os.getenv("SECRET_KEY", "emergency_secret_key")
 app.permanent_session_lifetime = timedelta(days=7) # Session 7 din tak valid rahega
 
@@ -26,7 +25,8 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://mavlabot:mavlabot@mavlabotclus
 client = MongoClient(MONGO_URI)
 db = client['hospital_system']
 
-# --- 📍 AUTO-INDEXING ---
+# --- 📍 AUTO-INDEXING & UNIQUE KEYS ---
+# 1. Geo-Spatial Indexing (Location ke liye)
 collections_to_index = ['users', 'hospitals', 'usersTree', 'emergency_requests']
 for coll in collections_to_index:
     try:
@@ -34,6 +34,13 @@ for coll in collections_to_index:
         print(f"✅ MongoDB: Geo-Index (2dsphere) for '{coll}' is Active!")
     except Exception as e:
         print(f"⚠️ Index Check ({coll}): {e}")
+
+# 2. Aadhar Card Unique Index (Taki ek Aadhar se duplicate register na ho)
+try:
+    db.users.create_index("aadhar_card", unique=True)
+    print("✅ MongoDB: Aadhar Card is now a Unique Primary Key!")
+except Exception as e:
+    print(f"⚠️ Aadhar Index Error: {e}")
 
 # --- 📧 EMAIL CONFIG ---
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
