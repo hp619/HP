@@ -1,24 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - HP SOS</title>
     <style>
-        body { font-family: Arial; background: #f2f2f2; }
-        .card { width: 340px; background: white; padding: 25px; margin: 80px auto; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,0.2); text-align: center; }
-        h2 { margin-bottom: 15px; }
-        .radio-group { display: flex; justify-content: center; margin-bottom: 15px; }
-        .radio-group input { display: none; }
-        .radio-group label { border: 2px solid black; padding: 6px 20px; cursor: pointer; margin: 0 5px; border-radius: 4px; }
-        .radio-group input:checked + label { background: black; color: white; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #e53935; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
-        .register-text { margin-top: 15px; font-size: 14px; }
-        .register-text a { text-decoration: none; color: #e53935; font-weight: bold; }
-        /* Flash message style */
-        .alert { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; border: 1px solid #c3e6cb; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f0f2f5; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card { 
+            width: 100%; 
+            max-width: 400px; 
+            background: white; 
+            padding: 35px 25px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
+            text-align: center; 
+        }
+        h2 { margin-bottom: 25px; color: #1a1a1a; font-size: 28px; font-weight: 700; }
         
-        /* Forgot Password Link Style */
-        .forgot-link { display: block; text-align: right; font-size: 12px; margin-bottom: 15px; text-decoration: none; color: #666; }
+        /* Radio Group Styling */
+        .radio-group { display: flex; justify-content: center; margin-bottom: 25px; gap: 10px; }
+        .radio-group input { display: none; }
+        .radio-group label { 
+            flex: 1;
+            border: 2px solid #ddd; 
+            padding: 10px; 
+            cursor: pointer; 
+            border-radius: 12px; 
+            font-weight: 600;
+            transition: 0.3s;
+            color: #555;
+        }
+        .radio-group input:checked + label { 
+            background: #212529; 
+            color: white; 
+            border-color: #212529; 
+        }
+
+        /* Input Styling */
+        input[type="text"], input[type="password"] { 
+            width: 100%; 
+            padding: 14px; 
+            margin: 12px 0; 
+            border: 2px solid #eee; 
+            border-radius: 12px; 
+            font-size: 16px; 
+            outline: none;
+            transition: 0.3s;
+        }
+        input:focus { border-color: #e53935; background: #fffcfc; }
+
+        /* Button Styling */
+        button { 
+            width: 100%; 
+            padding: 15px; 
+            background: #e53935; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 17px; 
+            font-weight: bold;
+            cursor: pointer; 
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+        button:hover { background: #c62828; transform: translateY(-1px); }
+
+        /* Links & Text */
+        .forgot-link { 
+            display: block; 
+            text-align: right; 
+            font-size: 14px; 
+            margin: 5px 0 20px 0; 
+            text-decoration: none; 
+            color: #666; 
+            font-weight: 500;
+        }
+        .forgot-link:hover { color: #e53935; }
+
+        .register-text { margin-top: 25px; font-size: 15px; color: #555; line-height: 1.6; }
+        .register-text a { text-decoration: none; color: #e53935; font-weight: 700; }
+        .register-text a:hover { text-decoration: underline; }
+
+        /* Alert Styling */
+        .alert { 
+            background: #feefef; 
+            color: #b91c1c; 
+            padding: 12px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            font-size: 14px; 
+            border: 1px solid #fecaca; 
+            font-weight: 500;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 480px) {
+            .card { padding: 25px 20px; border-radius: 15px; }
+            h2 { font-size: 24px; }
+        }
     </style>
 </head>
 <body>
@@ -42,18 +130,18 @@
             <label for="hospital">Hospital</label>
         </div>
 
-        <input type="text" name="user_id" placeholder="Enter 10-digit ID" required>
+        <input type="text" name="user_id" placeholder="Enter ID (PAT... / HOS...)" required>
         <input type="password" name="password" placeholder="Password" required>
         
         <a href="/forgot-password" class="forgot-link">Forgot Password?</a>
 
-        <button type="submit">Login</button>
+        <button type="submit">Login to Dashboard</button>
     </form>
 
     <div class="register-text">
         Don't have an account? <br>
         Register as 
-        <a href="/register/patient">Patient</a> / 
+        <a href="/register/patient">Patient</a> or 
         <a href="/register/hospital">Hospital</a>
     </div>
 </div>
