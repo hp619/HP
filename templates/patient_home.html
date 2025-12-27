@@ -222,7 +222,7 @@
         let map = null;
         let markers = {}; 
 
-        // --- PURANE UTILS (As it is) ---
+        // --- UTILS ---
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -245,7 +245,7 @@
             L.marker([lat, lng]).addTo(map).bindPopup("<b>Aapki Location</b>").openPopup();
         }
 
-        // --- SMART SEARCH (Updated Logic) ---
+        // --- SMART SEARCH ---
         function searchHospitals(query) {
             const box = document.getElementById('suggestionBox');
             const placeholder = document.getElementById('searchPlaceholder');
@@ -268,7 +268,6 @@
                         const div = document.createElement('div');
                         div.className = 'suggestion-item';
                         
-                        // Badge Selection
                         let badgeHtml = '';
                         if(hosp.is_registered) {
                             badgeHtml = `<span class="badge bg-warning text-dark">⭐ Partner</span><span class="stars-gold">★★★★★</span>`;
@@ -290,10 +289,8 @@
 
                         div.onclick = () => {
                             if(hosp.is_registered) {
-                                // Registered hospital -> Go to Info/Review page
                                 window.location.href = `/patient/hospital-info/${hosp.id}`;
                             } else {
-                                // CSV or Google Hospital -> Open Google Maps with Lat/Lng or Name
                                 let url = '';
                                 if(hosp.lat && hosp.lng) {
                                     url = `https://www.google.com/maps/search/?api=1&query=${hosp.lat},${hosp.lng}`;
@@ -312,7 +309,7 @@
             });
         }
 
-        // --- SOS POLLING & BROADCAST (As it is) ---
+        // --- SOS POLLING & BROADCAST ---
         function startResponsePolling(sosId, userLat, userLng) {
             if(responsePoller) clearInterval(responsePoller);
             if(userLat && userLng) initMap(userLat, userLng);
@@ -394,7 +391,7 @@
             element.classList.add('active');
         }
 
-        // --- PROFILE LOGIC (As it is) ---
+        // --- PROFILE LOGIC ---
         function requestUpdateOTP() {
             const data = {
                 name: document.getElementById('new_name').value,
