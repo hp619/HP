@@ -21,7 +21,7 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCsPEckg1hZpu9_cV4Q
 app.config['GOOGLE_MAPS_API_KEY'] = GOOGLE_MAPS_API_KEY
 
 # --- ☁️ MONGODB CONFIGURATION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://mavlabot:mavlabot@mavlabotcluster0.uoqbuck.mongodb.net/?appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://hospitalemergancy:hospitalemergancy@cluster0.wqgziaf.mongodb.net/?appName=Cluster0")
 client = MongoClient(MONGO_URI)
 db = client['hospital_system']
 
