@@ -1,28 +1,33 @@
-import os  # <--- Naya add kiya environment variables ke liye
-from flask import Flask, redirect, url_for
+import os  # Environment variables ke liye
+from flask import Flask, redirect, url_for, session # <--- session add kiya
 from flask_mail import Mail
 from pymongo import MongoClient, GEOSPHERE
 import webbrowser 
 from threading import Timer 
+from datetime import timedelta # <--- Naya add kiya session timing ke liye
 
 app = Flask(__name__, template_folder='templates')
+
+# --- 🔑 SESSION CONFIG (Fix for Logout on Refresh) ---
 # Railway par SECRET_KEY variable set kar dena, nahi toh ye use hoga
 app.secret_key = os.getenv("SECRET_KEY", "emergency_secret_key")
+app.permanent_session_lifetime = timedelta(days=7) # Session 7 din tak valid rahega
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True # Har request par session ko refresh/permanent rakhega
 
 # --- 🗺️ GOOGLE MAPS API CONFIG ---
-# Railway ke dashboard mein GOOGLE_MAPS_API_KEY add karna mat bhulna
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCsPEckg1hZpu9_cV4QJ8mKg3ByvMDmYOM") 
 app.config['GOOGLE_MAPS_API_KEY'] = GOOGLE_MAPS_API_KEY
 
 # --- ☁️ MONGODB CONFIGURATION ---
-# Railway ke variables mein MONGO_URI set karna hoga
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://mavlabot:mavlabot@mavlabotcluster0.uoqbuck.mongodb.net/?appName=Cluster0")
 client = MongoClient(MONGO_URI)
 db = client['hospital_system']
 
 # --- 📍 AUTO-INDEXING ---
 collections_to_index = ['users', 'hospitals', 'usersTree', 'emergency_requests']
-
 for coll in collections_to_index:
     try:
         db[coll].create_index([("location", "2dsphere")])
@@ -54,20 +59,16 @@ app.register_blueprint(hospital_bp)
 
 # --- 🌐 BROWSER AUTO-OPEN FUNCTION ---
 def open_browser():
-    # Production (Railway) par browser open karne ki zaroorat nahi hoti
-    if not os.getenv("RAILWAY_STATIC_URL"): 
+    if not os.getenv("RAILWAY_STATIC_URL") and not os.getenv("KOYEB_APP_NAME"): 
         webbrowser.open_new("http://127.0.0.1:5000/")
 
 if __name__ == '__main__':
     print("Server starting...")
-    
-    # Railway environment variable se PORT uthayega, nahi toh local 5000 use karega
     port = int(os.environ.get("PORT", 5000))
     
     # Local machine par ho toh hi browser khulega
-    if not os.getenv("RAILWAY_STATIC_URL"):
+    if not os.getenv("RAILWAY_STATIC_URL") and not os.getenv("KOYEB_APP_NAME"):
         Timer(1.5, open_browser).start()
         app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
     else:
-        # Railway ke liye direct run
         app.run(host='0.0.0.0', port=port)
