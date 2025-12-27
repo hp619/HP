@@ -49,7 +49,6 @@ body { background:#fdfdfd; padding-bottom:80px; font-family:'Segoe UI',sans-seri
     100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
 }
 
-/* NAYA STYLE: OTP Modal & Response Modal ke liye */
 #otpOverlay, #responseOverlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.7); display: none; z-index: 2000;
@@ -57,9 +56,11 @@ body { background:#fdfdfd; padding-bottom:80px; font-family:'Segoe UI',sans-seri
 }
 .otp-box { background: white; padding: 30px; border-radius: 15px; text-align: center; width: 90%; max-width: 400px; }
 
-/* Location Button Style */
 .btn-location { background: #007bff; color: white; border: none; padding: 10px; border-radius: 8px; margin-bottom: 10px; width: 100%; }
 .location-success { color: #28a745; font-weight: bold; font-size: 12px; display: none; }
+
+/* NAYA STYLE: Time Badge ke liye */
+.time-badge { font-size: 12px; background: #f8f9fa; padding: 2px 8px; border-radius: 10px; color: #6c757d; border: 1px solid #dee2e6; }
 </style>
 </head>
 
@@ -259,9 +260,18 @@ function checkForEmergencies() {
             data.alerts.forEach(a => {
                 const lat = a.location.coordinates[1];
                 const lng = a.location.coordinates[0];
+                
+                // NAYA LOGIC: Backend se time lekar yahan dikhana
+                // Agar backend "time" field bhej raha hai toh wo dikhega, nahi toh current time
+                const requestTime = a.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                 const card = `
                 <div class="card mb-3 emergency-card shadow-sm">
-                    <div class="card-body">
+                    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pb-0">
+                        <span class="time-badge"><i class="fa fa-clock"></i> Recieved: ${requestTime}</span>
+                        <span class="badge bg-danger">LIVE</span>
+                    </div>
+                    <div class="card-body pt-2">
                         <h6 class="text-danger fw-bold"><i class="fa fa-exclamation-triangle"></i> CRITICAL SOS (${a.sos_id})</h6>
                         <p class="mb-1"><b>Patient:</b> ${a.patient_name}</p>
                         <p class="mb-1"><b>Phone:</b> ${a.phone}</p>
@@ -283,13 +293,11 @@ function checkForEmergencies() {
 
 setInterval(checkForEmergencies, 5000);
 
-// NAYA LOGIC: SOS Accept karne ke liye modal kholna
 function openAcceptModal(sosId) {
     document.getElementById('current_sos_id').value = sosId;
     document.getElementById('responseOverlay').style.display = 'flex';
 }
 
-// NAYA LOGIC: Backend ko response bhejna
 function submitSOSResponse() {
     const sosId = document.getElementById('current_sos_id').value;
     const specialist = document.getElementById('resp_specialist').value || 'Emergency Doctor';
