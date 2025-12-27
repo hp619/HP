@@ -52,7 +52,8 @@
             margin-top: 10px; 
             transition: 0.3s;
         }
-        button:hover { background: #219150; transform: translateY(-1px); }
+        button:hover:not(:disabled) { background: #219150; transform: translateY(-1px); }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         
         .gps-btn { 
             background: #1a73e8; 
@@ -136,6 +137,7 @@
 
 <script>
 let step = 1;
+let cooldown = false;
 
 function getLocation() {
     const msg = document.getElementById('location-msg');
@@ -149,26 +151,36 @@ function getLocation() {
         }, (error) => {
             msg.innerText = "❌ Error: Please allow location access.";
             msg.style.color = "red";
-            alert("Location access denied!");
         });
-    } else {
-        alert("Aapka browser GPS support nahi karta.");
     }
 }
 
 window.onload = getLocation;
 
-function isStrongPassword(password) {
-    const minLength = 8;
-    const hasNumber = /\d/;
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/;
-    if (password.length < minLength) return "Password kam se kam 8 characters ka hona chahiye!";
-    if (!hasNumber.test(password)) return "Password mein ek number hona chahiye!";
-    if (!hasSpecialChar.test(password)) return "Password mein ek special character hona chahiye!";
-    return true;
+function startTimer(seconds) {
+    cooldown = true;
+    const btn = document.getElementById('btn');
+    let timeLeft = seconds;
+    
+    const timer = setInterval(() => {
+        if (step === 1) {
+            btn.disabled = true;
+            btn.innerText = `Wait ${timeLeft}s`;
+            timeLeft--;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.innerText = "Send OTP";
+                cooldown = false;
+            }
+        } else {
+            clearInterval(timer); // Step 2 mein timer ki zarurat nahi
+        }
+    }, 1000);
 }
 
 function handle() {
+    const btn = document.getElementById('btn');
     const p1 = document.getElementById('pass').value;
     const p2 = document.getElementById('c_pass').value;
     const email = document.getElementById('email').value;
@@ -182,8 +194,9 @@ function handle() {
     if(step === 1) {
         if(!hName || !hDate || !email || !hAddress) { alert("Details bharna zaroori hai!"); return; }
         if(p1 !== p2) { alert("Passwords match nahi ho rahe!"); return; }
-        const strengthCheck = isStrongPassword(p1);
-        if(strengthCheck !== true) { alert(strengthCheck); return; }
+        
+        btn.disabled = true;
+        btn.innerText = "Checking...";
 
         fetch('/send-otp-only', {
             method: 'POST',
@@ -199,17 +212,25 @@ function handle() {
                 lat: hLat ? parseFloat(hLat) : null, 
                 lng: hLng ? parseFloat(hLng) : null  
             })
-        }).then(res => {
+        }).then(async res => {
+            const result = await res.json();
             if(res.ok) {
                 document.getElementById('otp-box').style.display = 'block';
-                document.getElementById('btn').innerText = 'Verify & Register';
+                btn.innerText = 'Verify & Register';
+                btn.disabled = false;
                 step = 2;
                 alert("OTP bhej diya gaya hai!");
             } else {
-                alert("Server error!");
+                alert(result.message || "Email already exists or Server Error!");
+                btn.disabled = false;
+                btn.innerText = "Send OTP";
             }
+        }).catch(() => {
+            btn.disabled = false;
+            btn.innerText = "Send OTP";
         });
     } else {
+        btn.innerText = "Registering...";
         fetch('/verify-and-register', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
