@@ -93,15 +93,17 @@ def verify_update():
 # --- 4. SMART SEARCH LOGIC (Updated to show 2 Lakh CSV Data + Registered) ---
 @patient_bp.route('/search_hospitals', methods=['GET'])
 def search_hospitals():
-    from app import db, GOOGLE_MAPS_API_KEY
+    from app import db, db_external, GOOGLE_MAPS_API_KEY # db_external add kiya
     query = request.args.get('q', '').strip()
+    u_lat = request.args.get('lat')
+    u_lng = request.args.get('lng')
+
     if len(query) < 2:
         return jsonify([])
 
     results = []
 
     # A. Search in Registered Hospitals (Our App Partners)
-    # Note: Hum 'hospital_name' use kar rahe hain jo registered collection mein hai
     db_results = list(db.hospitals.find({
         "hospital_name": {"$regex": query, "$options": "i"}
     }).limit(5))
@@ -112,17 +114,24 @@ def search_hospitals():
             "address": h.get('address', 'Registered Partner'),
             "type": "Certified",
             "is_registered": True,
-            "id": h.get('user_id') # Dashboard isse Review page par bhejega
+            "id": h.get('user_id') 
         })
 
-    # B. Search in External Hospitals (CSV Data - 2 Lakh records)
-    # Note: CSV script mein humne 'hospital_name' hi store kiya tha
-    csv_results = list(db.external_hospitals.find({
-        "hospital_name": {"$regex": query, "$options": "i"}
-    }).limit(10))
+    # B. Search in External Hospitals (2 Lakh CSV Data) - 10KM Priority
+    geo_query = {"hospital_name": {"$regex": query, "$options": "i"}}
+    
+    # Distance Logic: Agar patient location hai toh 10km ke andar dhoondo
+    if u_lat and u_lng:
+        geo_query["location"] = {
+            "$near": {
+                "$geometry": { "type": "Point", "coordinates": [float(u_lng), float(u_lat)] },
+                "$maxDistance": 10000 
+            }
+        }
+
+    csv_results = list(db_external.external_hospitals.find(geo_query).limit(10))
 
     for c in csv_results:
-        # Lat/Lng extract kar rahe hain taaki Dashboard Google Maps khol sake
         coords = c.get('location', {}).get('coordinates', [0, 0])
         results.append({
             "name": c.get('hospital_name'),
@@ -163,13 +172,12 @@ def hospital_info(hos_id):
     if not hospital:
         return "Hospital Not Found", 404
 
-    # Reviews se real average rating nikalna
     reviews = list(db.reviews.find({"hospital_id": hos_id}))
     if reviews:
         avg_rating = sum([r['rating'] for r in reviews]) / len(reviews)
         review_count = len(reviews)
     else:
-        avg_rating = 5.0 # Naye hospital ke liye default 5 star
+        avg_rating = 5.0 
         review_count = 0
 
     return render_template('hospital_info.html', hospital=hospital, avg_rating=round(avg_rating, 1), review_count=review_count)
@@ -232,7 +240,6 @@ def broadcast_emergency():
         }
         db.emergency_requests.insert_one(sos_entry)
 
-        # Registered Hospitals search logic based on Location
         nearby_hospitals = list(db.hospitals.find({
             "location": {
                 "$nearSphere": {
