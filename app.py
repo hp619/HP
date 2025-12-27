@@ -60,43 +60,36 @@ mail = Mail(app)
 @app.route('/patient/search_hospitals')
 def search_hospitals():
     query = request.args.get('q', '')
-    lat = request.args.get('lat')
-    lng = request.args.get('lng')
-
     results = []
 
-    # A. Pehle Registered Hospitals search karo
+    # 1. Partner Hospitals (Registered) Search
+    # $options: "i" matlab case-insensitive (chhota-bada akshar sab chalega)
     reg_hospitals = db.hospitals.find({
         "hospital_name": {"$regex": query, "$options": "i"}
-    }).limit(5)
+    }).limit(10)
 
     for h in reg_hospitals:
         results.append({
-            "id": str(h['_id']),
+            "id": str(h.get('user_id', h['_id'])), # user_id zaroori hai info page ke liye
             "name": h['hospital_name'],
-            "address": h.get('address', 'Partner Hospital'),
-            "is_registered": True
+            "address": h.get('address', 'Verified Partner'),
+            "is_registered": True,
+            "beds": h.get('beds_available', 0)
         })
 
-    # B. Phir 2 Lakh CSV hospitals search karo (Distance based)
-    geo_query = {"hospital_name": {"$regex": query, "$options": "i"}}
-    if lat and lng:
-        geo_query["location"] = {
-            "$near": {
-                "$geometry": {"type": "Point", "coordinates": [float(lng), float(lat)]},
-                "$maxDistance": 15000 # 15 KM radius
-            }
-        }
+    # 2. Agar results kam hain, toh external DB (2 Lakh list) se uthao
+    if len(results) < 5:
+        ext_hospitals = db_external.external_hospitals.find({
+            "hospital_name": {"$regex": query, "$options": "i"}
+        }).limit(10)
 
-    ext_hospitals = db_external.external_hospitals.find(geo_query).limit(10)
-
-    for h in ext_hospitals:
-        results.append({
-            "id": str(h['_id']),
-            "name": h['hospital_name'],
-            "address": h.get('address', 'Govt/Public Facility'),
-            "is_registered": False
-        })
+        for h in ext_hospitals:
+            results.append({
+                "id": str(h['_id']),
+                "name": h['hospital_name'],
+                "address": h.get('address', 'Public Health Centre'),
+                "is_registered": False
+            })
 
     return jsonify(results)
 
