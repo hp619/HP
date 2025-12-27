@@ -34,8 +34,8 @@ for coll in collections_to_index:
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME", 'anujmore726@gmail.com')
-app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD", 'pllr axia ofnl xdsi')
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME", 'hospitalofficiall@gmail.com')
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD", 'wzei dibe mcte ywhi')
 mail = Mail(app)
 
 # --- 🔄 AUTO REDIRECT LOGIC ---
