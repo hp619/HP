@@ -44,8 +44,10 @@
 
         #sosMap { height: 250px; width: 100%; border-radius: 15px; margin-bottom: 20px; display: none; border: 2px solid #ffc107; }
         
-        /* NEW: Distance Badge */
         .dist-badge { background: #fff3cd; color: #856404; font-size: 12px; padding: 4px 8px; border-radius: 50px; border: 1px solid #ffeeba; }
+        
+        /* NAYA: Stars for Registered Hospitals */
+        .stars-gold { color: #f1c40f; font-size: 13px; margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -103,7 +105,6 @@
             <h4 class="fw-bold text-danger"><i class="fa fa-ambulance"></i> Emergency Broadcast</h4>
             <p class="text-muted small">Alert all hospitals within 10km radius immediately.</p>
             <hr>
-            
             <div class="card card-custom p-4 text-center">
                 <div id="sosButton" class="sos-circle shadow-lg" onclick="triggerSOS()">SOS</div>
                 <p id="sosStatus" class="small text-danger fw-bold mt-2">TAP TO BROADCAST EMERGENCY</p>
@@ -221,27 +222,24 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // --- LOGIC: MAP, DISTANCE & ETA ---
         let responsePoller = null;
         let map = null;
         let markers = {}; 
 
-        // Haversine Formula for Distance Calculation
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radius of Earth in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return (R * c).toFixed(1); // Return distance in KM
+            return (R * c).toFixed(1);
         }
 
-        // Logic for Estimated Time (ETA)
         function calculateETA(distance) {
-            const avgSpeedAmbulance = 40; // 40 km/h average
+            const avgSpeedAmbulance = 40;
             const timeInMinutes = Math.round((distance / avgSpeedAmbulance) * 60);
-            return timeInMinutes + 5; // Adding 5 mins buffer for traffic
+            return timeInMinutes + 5;
         }
 
         function initMap(lat, lng) {
@@ -260,26 +258,18 @@
                 fetch(`/patient/get_sos_responses?sos_id=${sosId}`)
                 .then(res => res.json())
                 .then(data => {
-                    if(data.responses && data.responses.length > 0) {
+                    if(data.hospitals && data.hospitals.length > 0) {
                         const area = document.getElementById('liveResponseArea');
                         const list = document.getElementById('responseList');
                         area.style.display = 'block';
                         list.innerHTML = '';
                         
-                        data.responses.forEach(resp => {
-                            // Calculate Distance & ETA
-                            const dist = calculateDistance(userLat, userLng, resp.latitude, resp.longitude);
+                        data.hospitals.forEach(resp => {
+                            const dist = calculateDistance(userLat, userLng, resp.lat, resp.lng);
                             const eta = calculateETA(dist);
 
-                            if(map && resp.latitude && resp.longitude && !markers[resp.hospital_id]) {
-                                let hMarker = L.marker([resp.latitude, resp.longitude], {
-                                    icon: L.icon({
-                                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', 
-                                        iconSize: [30, 30]
-                                    })
-                                }).addTo(map)
-                                .bindPopup(`<b>${resp.hospital_name}</b><br>${dist} km away`);
-                                markers[resp.hospital_id] = hMarker;
+                            if(map && resp.lat && resp.lng && !markers[resp.hospital_id]) {
+                                markers[resp.hospital_id] = L.marker([resp.lat, resp.lng]).addTo(map).bindPopup(resp.hospital_name);
                             }
 
                             list.innerHTML += `
@@ -290,12 +280,11 @@
                                     </div>
                                     <p class="small text-muted mt-2 mb-2">
                                         <i class="fa fa-clock text-primary"></i> Est. Arrival: <b>${eta} mins</b><br>
-                                        <i class="fa fa-user-md"></i> Specialist: <b>${resp.specialist_name}</b><br>
-                                        <i class="fa fa-bed"></i> Beds Free: <b>${resp.free_beds}</b>
+                                        <i class="fa fa-user-md"></i> Specialist: <b>${resp.specialist_name}</b>
                                     </p>
                                     <div class="d-flex gap-2">
-                                        <button onclick="selectHospital('${sosId}', '${resp.hospital_id}')" class="btn btn-sm btn-dark flex-grow-1 fw-bold">CHOOSE HOSPITAL</button>
-                                        <a href="https://www.google.com/maps/dir/?api=1&destination=${resp.latitude},${resp.longitude}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fa fa-directions"></i></a>
+                                        <button onclick="window.location.href='/patient/hospital-info/${resp.hospital_id}'" class="btn btn-sm btn-outline-primary flex-grow-1 fw-bold">VIEW INFO</button>
+                                        <button onclick="selectHospital('${sosId}', '${resp.hospital_id}')" class="btn btn-sm btn-dark flex-grow-1 fw-bold">CHOOSE</button>
                                     </div>
                                 </div>
                             `;
@@ -305,11 +294,9 @@
             }, 3000); 
         }
 
-        // --- THE REST OF YOUR SCRIPTS (selectHospital, changeTab, searchHospitals, triggerSOS, etc.) ---
-        // Same as provided in your original code snippet...
         function selectHospital(sosId, hospitalId) {
             if(confirm("Confirm this hospital? They will be notified immediately.")) {
-                fetch('/patient/confirm_hospital', {
+                fetch('/patient/final_selection', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ sos_id: sosId, hospital_id: hospitalId })
@@ -317,7 +304,7 @@
                 .then(res => res.json())
                 .then(res => {
                     if(res.status === 'success') {
-                        alert("✅ Hospital Confirmed! Ambulance/Doctor alerted.");
+                        alert("✅ Hospital Confirmed!");
                         clearInterval(responsePoller);
                         location.reload();
                     }
@@ -347,17 +334,25 @@
                     data.forEach(hosp => {
                         const div = document.createElement('div');
                         div.className = 'suggestion-item';
-                        const sourceBadge = hosp.is_live ? '<span class="badge-live"><i class="fa fa-globe"></i> Live</span>' : '<span class="badge bg-primary" style="font-size:9px;">Registered</span>';
+                        
+                        let badgeHtml = hosp.is_registered ? 
+                            `<span class="badge bg-primary">Registered</span><span class="stars-gold">★★★★★</span>` : 
+                            `<span class="badge-live"><i class="fa fa-globe"></i> Live</span>`;
+
                         div.innerHTML = `
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="fw-bold text-dark"><i class="fa fa-hospital text-danger"></i> ${hosp.name}</div>
-                                ${sourceBadge}
+                                ${badgeHtml}
                             </div>
                             <div class="small text-muted">${hosp.address}</div>
                         `;
                         div.onclick = () => {
-                            const searchQuery = encodeURIComponent(hosp.name + " " + hosp.address);
-                            window.open(`https://www.google.com/maps/search/?api=1&query=${searchQuery}`, '_blank');
+                            if(hosp.is_registered) {
+                                window.location.href = `/patient/hospital-info/${hosp.id}`;
+                            } else {
+                                const searchQuery = encodeURIComponent(hosp.name + " " + hosp.address);
+                                window.open(`https://www.google.com/search?q=${searchQuery}`, '_blank');
+                            }
                         };
                         box.appendChild(div);
                     });
@@ -372,51 +367,32 @@
             const btn = document.getElementById('sosButton');
             const alertInfo = document.getElementById('sosAlertCount');
 
-            if (confirm("🚨 EMERGENCY! Kya aap nearby 10km ke sabhi hospitals ko alert bhejna chahte hain?")) {
-                statusText.innerText = "CAPTURING LIVE GPS...";
-                btn.style.background = "#ffc107"; 
+            if (confirm("🚨 EMERGENCY! Alert hospitals?")) {
+                statusText.innerText = "CAPTURING GPS...";
                 btn.classList.add('pulse-red');
 
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition((position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
-                        statusText.innerText = "FINDING NEARBY HOSPITALS...";
                         
                         fetch('/patient/broadcast_emergency', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                lat: lat,
-                                lng: lng,
-                                description: document.getElementById('emergencyDesc').value || "Urgent Medical Assistance Needed!"
+                                lat: lat, lng: lng,
+                                description: document.getElementById('emergencyDesc').value || "Urgent!"
                             })
                         })
                         .then(res => res.json())
                         .then(res => {
                             if(res.status === 'success') {
-                                if(res.found > 0) {
-                                    alert(`✅ SUCCESS! ${res.found} hospitals ko alert bhej diya gaya hai.`);
-                                    statusText.innerText = `WAITING FOR RESPONSES...`;
-                                    alertInfo.innerHTML = `<b class="text-danger"><i class="fa fa-broadcast-tower"></i> Active SOS:</b> Waiting for response from ${res.found} hospitals.`;
-                                    btn.style.background = "#28a745"; 
-                                    changeTab(document.querySelector('.nav-item'), 'home');
-                                    startResponsePolling(res.sos_id, lat, lng);
-                                } else {
-                                    alert("⚠️ FAILED: 10km radius mein koi registered hospital nahi mila.");
-                                    statusText.innerText = "NO HOSPITALS IN 10KM";
-                                    btn.style.background = "#6c757d"; 
-                                    btn.classList.remove('pulse-red');
-                                }
+                                alert(`✅ Alert Sent to ${res.found} hospitals.`);
+                                changeTab(document.querySelector('.nav-item'), 'home');
+                                startResponsePolling(res.sos_id, lat, lng);
                             }
-                        })
-                        .catch(err => {
-                            alert("❌ Error: SOS Broadcast fail ho gaya.");
-                            statusText.innerText = "SYSTEM ERROR";
                         });
-                    }, (error) => {
-                        alert("GPS on karo bhai!");
-                    }, { enableHighAccuracy: true });
+                    }, (error) => { alert("GPS on karo!"); });
                 }
             }
         }
@@ -426,10 +402,7 @@
                 name: document.getElementById('new_name').value,
                 email: document.getElementById('new_email').value,
                 phone: document.getElementById('new_phone').value,
-                gender: document.getElementById('new_gender').value,
-                medical_history: document.getElementById('new_history').value,
-                blood_group: document.getElementById('new_blood').value,
-                insurance_no: document.getElementById('new_insurance').value
+                gender: document.getElementById('new_gender').value
             };
             fetch('/patient/request_update_otp', {
                 method: 'POST',
@@ -451,12 +424,7 @@
             })
             .then(res => res.json())
             .then(res => {
-                if(res.status === 'success') {
-                    alert("Profile updated!");
-                    window.location.reload();
-                } else {
-                    alert("Galat OTP!");
-                }
+                if(res.status === 'success') { window.location.reload(); }
             });
         }
     </script>
