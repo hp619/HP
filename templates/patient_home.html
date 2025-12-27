@@ -245,7 +245,7 @@
             L.marker([lat, lng]).addTo(map).bindPopup("<b>Aapki Location</b>").openPopup();
         }
 
-        // --- SMART SEARCH ---
+        // --- SMART SEARCH (FIXED CLICK LOGIC) ---
         function searchHospitals(query) {
             const box = document.getElementById('suggestionBox');
             const placeholder = document.getElementById('searchPlaceholder');
@@ -287,16 +287,14 @@
                             <div class="small text-muted" style="font-size: 12px;">${hosp.address}</div>
                         `;
 
+                        // FIXED CLICK LOGIC
                         div.onclick = () => {
                             if(hosp.is_registered) {
+                                // Redirects to Partner Info Page
                                 window.location.href = `/patient/hospital-info/${hosp.id}`;
                             } else {
-                                let url = '';
-                                if(hosp.lat && hosp.lng) {
-                                    url = `https://www.google.com/maps/search/?api=1&query=${hosp.lat},${hosp.lng}`;
-                                } else {
-                                    url = `https://www.google.com/search?q=${encodeURIComponent(hosp.name + " " + hosp.address)}`;
-                                }
+                                // Google Search for non-partners
+                                let url = `https://www.google.com/search?q=${encodeURIComponent(hosp.name + " " + hosp.address)}`;
                                 window.open(url, '_blank');
                             }
                         };
@@ -309,7 +307,7 @@
             });
         }
 
-        // --- SOS POLLING & BROADCAST ---
+        // --- SOS POLLING & BROADCAST (FIXED INFO BUTTON) ---
         function startResponsePolling(sosId, userLat, userLng) {
             if(responsePoller) clearInterval(responsePoller);
             if(userLat && userLng) initMap(userLat, userLng);
