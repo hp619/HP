@@ -4,6 +4,7 @@ import requests
 
 patient_bp = Blueprint('patient_bp', __name__, url_prefix='/patient')
 
+# --- 1. PATIENT HOME (Original) ---
 @patient_bp.route('/home')
 def patient_home():
     from app import db
@@ -16,6 +17,7 @@ def patient_home():
 
     return render_template('patient_home.html', user=patient_data)
 
+# --- 2. UPDATE PROFILE (Original) ---
 @patient_bp.route('/update_profile', methods=['POST'])
 def update_profile():
     from app import db
@@ -34,8 +36,7 @@ def update_profile():
     flash("Profile Updated Successfully!", "success")
     return redirect(url_for('patient_bp.patient_home'))
 
-# --- OTP ROUTES (SECURE UPDATE) ---
-
+# --- 3. OTP ROUTES (Original - SECURE UPDATE) ---
 @patient_bp.route('/request_update_otp', methods=['POST'])
 def request_update_otp():
     from app import mail, db
@@ -89,8 +90,7 @@ def verify_update():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- SMART SEARCH LOGIC ---
-
+# --- 4. SMART SEARCH LOGIC (Updated with CSV & Info Page) ---
 @patient_bp.route('/search_hospitals', methods=['GET'])
 def search_hospitals():
     from app import db, GOOGLE_MAPS_API_KEY
@@ -98,6 +98,7 @@ def search_hospitals():
     if len(query) < 2:
         return jsonify([])
 
+    # A. Search in Registered Hospitals (Our MongoDB)
     db_results = list(db.hospitals.find({
         "hospital_name": {"$regex": query, "$options": "i"}
     }).limit(5))
@@ -106,11 +107,27 @@ def search_hospitals():
     for h in db_results:
         results.append({
             "name": h.get('hospital_name'),
-            "address": h.get('address', 'Registered in System'),
-            "type": "Registered",
-            "is_live": False
+            "address": h.get('address', 'Registered'),
+            "type": "Certified",
+            "is_registered": True,
+            "id": h.get('user_id')
         })
 
+    # B. Search in CSV Data (External)
+    csv_results = list(db.external_hospitals.find({
+        "Facility Name": {"$regex": query, "$options": "i"}
+    }).limit(5))
+
+    for c in csv_results:
+        results.append({
+            "name": c.get('Facility Name'),
+            "address": f"{c.get('State Name')}, {c.get('District Name')}",
+            "type": "Govt/Public",
+            "is_registered": False,
+            "google_search": True
+        })
+
+    # C. Google Maps Search (Original Logic Kept)
     try:
         google_url = f"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={query}&types=establishment&location=20.5937,78.9629&radius=2000000&key={GOOGLE_MAPS_API_KEY}"
         response = requests.get(google_url).json()
@@ -123,7 +140,8 @@ def search_hospitals():
                         "name": place['structured_formatting']['main_text'],
                         "address": place['structured_formatting']['secondary_text'],
                         "type": "Live (India)",
-                        "is_live": True,
+                        "is_registered": False,
+                        "google_search": True,
                         "place_id": place['place_id']
                     })
     except Exception as e:
@@ -131,29 +149,42 @@ def search_hospitals():
 
     return jsonify(results)
 
-# --- NEW: POLLING ROUTE FOR PATIENT (Hospitals ki list dekhne ke liye) ---
+# --- 5. HOSPITAL INFO PAGE (New Route for Real Rating) ---
+@patient_bp.route('/hospital-info/<hos_id>')
+def hospital_info(hos_id):
+    from app import db
+    hospital = db.hospitals.find_one({"user_id": hos_id})
+    if not hospital:
+        return "Hospital Not Found", 404
 
+    # Rating logic: Calculate real average or default to 0 (HTML will show 5)
+    reviews = list(db.reviews.find({"hospital_id": hos_id}))
+    if reviews:
+        avg_rating = sum([r['rating'] for r in reviews]) / len(reviews)
+        review_count = len(reviews)
+    else:
+        avg_rating = 0
+        review_count = 0
+
+    return render_template('hospital_info.html', hospital=hospital, avg_rating=round(avg_rating, 1), review_count=review_count)
+
+# --- 6. POLLING & SOS LOGIC (Original - DO NOT REMOVE) ---
 @patient_bp.route('/get_sos_responses', methods=['GET'])
 def get_live_responses():
     from app import db
     patient_id = session.get('user_id')
-    
-    # Patient ki sabse latest active request uthao
     latest_request = db.emergency_requests.find_one(
         {"patient_id": patient_id, "status": "active"},
         sort=[("_id", -1)]
     )
-    
     if not latest_request:
         return jsonify({"status": "no_active_request", "hospitals": []})
     
     return jsonify({
         "status": "success",
         "sos_id": latest_request['sos_id'],
-        "hospitals": latest_request.get('responses', []) # Hospital list yahan se jayegi
+        "hospitals": latest_request.get('responses', []) 
     })
-
-# --- NEW: FINAL SELECTION BY PATIENT ---
 
 @patient_bp.route('/final_selection', methods=['POST'])
 def final_selection():
@@ -162,7 +193,6 @@ def final_selection():
     sos_id = data.get('sos_id')
     hospital_id = data.get('hospital_id')
     
-    # Status update karo taaki baki hospitals ko pata chale selection ho gaya
     db.emergency_requests.update_one(
         {"sos_id": sos_id},
         {"$set": {
@@ -170,11 +200,9 @@ def final_selection():
             "selected_hospital_id": hospital_id
         }}
     )
-    return jsonify({"status": "success", "message": "Hospital Selected! Specialist Assigning..."})
+    return jsonify({"status": "success", "message": "Hospital Selected!"})
 
-
-# --- EMERGENCY BROADCAST (UPDATED FOR TWO-WAY) ---
-
+# --- 7. EMERGENCY BROADCAST (Original) ---
 @patient_bp.route('/broadcast_emergency', methods=['POST'])
 def broadcast_emergency():
     from app import db
@@ -193,7 +221,7 @@ def broadcast_emergency():
             "description": description,
             "location": { "type": "Point", "coordinates": [p_lng, p_lat] },
             "status": "active",
-            "responses": [],  # <--- NAYA: Hospitals yahan jama honge
+            "responses": [], 
             "timestamp": random.randint(100000, 999999) 
         }
         db.emergency_requests.insert_one(sos_entry)
@@ -208,10 +236,7 @@ def broadcast_emergency():
         }))
 
         count = len(nearby_hospitals)
-        print(f"🚨 SOS BROADCAST: From [{p_lat}, {p_lng}] - Found {count} hospitals.")
-        
         return jsonify({"status": "success", "found": count, "sos_id": sos_id}), 200
 
     except Exception as e:
-        print(f"SOS Error Details: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
