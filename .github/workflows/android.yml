@@ -1,12 +1,19 @@
 name: Build Android APK
 on: [push]
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Buildozer Action
-        uses: ArtemSerebrennkov/buildozer-action@v1
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip build-essential git python3 python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
+          pip3 install --user --upgrade Cython==0.29.33 virtualenv
+
+      - name: Build with Buildozer
+        uses: Kuldeep-Verma/buildozer-action@v1
         with:
-          buildozer_version: master
           command: buildozer -v android debug
