@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { background-color: #f0f2f5; padding-bottom: 80px; font-family: 'Segoe UI', sans-serif; }
+        
+        .header-bg { background: #212529; color: #ffc107; padding: 30px 20px; border-radius: 0 0 25px 25px; margin-bottom: 25px; border-bottom: 3px solid #ffc107; }
+        
+        .nav-bottom { position: fixed; bottom: 0; width: 100%; background: #212529; display: flex; justify-content: space-around; padding: 12px 0; border-top: 2px solid #333; z-index: 1000; }
+        .nav-item { text-align: center; color: #888; text-decoration: none; font-size: 11px; flex: 1; border: none; background: none; transition: 0.3s; }
+        .nav-item i { font-size: 22px; display: block; margin-bottom: 2px; }
+        .nav-item.active { color: #ffc107; font-weight: bold; }
+
+        .content-section { display: none; animation: fadeIn 0.4s; }
+        .active-section { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card-custom { border: none; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; background: white; }
+        
+        .sos-circle { width: 120px; height: 120px; border-radius: 50%; background: #dc3545; color: white; border: 8px solid #f8d7da; font-weight: bold; font-size: 20px; box-shadow: 0 0 20px rgba(220, 53, 69, 0.4); display: flex; align-items: center; justify-content: center; margin: 20px auto; cursor: pointer; transition: 0.2s; }
+        .sos-circle:active { transform: scale(0.9); }
+
+        #otpOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 2000; justify-content: center; align-items: center; }
+        .otp-box { background: white; padding: 30px; border-radius: 20px; text-align: center; width: 90%; max-width: 380px; }
+
+        .suggestion-box { position: absolute; width: 100%; background: white; z-index: 1050; border-radius: 0 0 10px 10px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); max-height: 300px; overflow-y: auto; display: none; }
+        .suggestion-item { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .suggestion-item:hover { background: #f8f9fa; }
+        
+        .badge-live { background: #e9ecef; color: #495057; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+
+        .hospital-response-card { border-left: 5px solid #28a745; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        .pulse-red { animation: pulse-red-anim 1.5s infinite; }
+        @keyframes pulse-red-anim { 0% { box-shadow: 0 0 0 0px rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0px rgba(220, 53, 69, 0); } }
+
+        #sosMap { height: 250px; width: 100%; border-radius: 15px; margin-bottom: 20px; display: none; border: 2px solid #ffc107; }
+        
+        /* NEW: Distance Badge */
+        .dist-badge { background: #fff3cd; color: #856404; font-size: 12px; padding: 4px 8px; border-radius: 50px; border: 1px solid #ffeeba; }
+    </style>
+</head>
+<body>
+
+    <div id="home" class="content-section active-section">
+        <div class="header-bg text-center">
+            <h4>Namaste, {{ user.patient_name }}</h4>
+            <p class="mb-0">Patient ID: <b>{{ user.user_id }}</b></p>
+        </div>
+        <div class="container">
+            <div id="sosMap"></div>
+
+            <div id="liveResponseArea" style="display: none;" class="mb-4">
+                <h6 class="fw-bold text-danger mb-3"><i class="fa fa-circle-notch fa-spin"></i> Nearby Hospitals Responding...</h6>
+                <div id="responseList"></div>
+            </div>
+
+            <div class="card card-custom p-4">
+                <h6 class="fw-bold"><i class="fa fa-heartbeat text-danger"></i> My Quick Info</h6>
+                <hr>
+                <div class="d-flex justify-content-between mb-2"><span>Aadhar:</span> <b>{{ user.aadhar_no }}</b></div>
+                <div class="d-flex justify-content-between mb-2"><span>Phone:</span> <b>{{ user.phone or 'Not Set' }}</b></div>
+                <div class="d-flex justify-content-between"><span>Email:</span> <b>{{ user.email }}</b></div>
+            </div>
+
+            <div class="card card-custom p-4 border-start border-warning border-4">
+                <h6 class="fw-bold"><i class="fa fa-info-circle text-warning"></i> Current Status</h6>
+                <p id="sosAlertCount" class="small text-muted mb-0">No active emergency requests. Stay safe!</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="search" class="content-section">
+        <div class="p-4">
+            <h4 class="fw-bold"><i class="fa fa-search text-primary"></i> All India Search</h4>
+            <p class="text-muted small">Find any hospital in our system or across India via Google.</p>
+            <hr>
+            <div class="position-relative">
+                <div class="input-group mb-4 shadow-sm">
+                    <input type="text" id="hospitalSearchInput" class="form-control" placeholder="Search SMBT, Apollo, etc..." onkeyup="searchHospitals(this.value)">
+                    <button class="btn btn-warning"><i class="fa fa-search text-dark"></i></button>
+                </div>
+                <div id="suggestionBox" class="suggestion-box border"></div>
+            </div>
+            
+            <div id="searchPlaceholder" class="bg-light p-5 text-center rounded-4 border">
+                <i class="fa fa-map-marked-alt fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Type hospital name to see live suggestions...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="request" class="content-section">
+        <div class="p-4">
+            <h4 class="fw-bold text-danger"><i class="fa fa-ambulance"></i> Emergency Broadcast</h4>
+            <p class="text-muted small">Alert all hospitals within 10km radius immediately.</p>
+            <hr>
+            
+            <div class="card card-custom p-4 text-center">
+                <div id="sosButton" class="sos-circle shadow-lg" onclick="triggerSOS()">SOS</div>
+                <p id="sosStatus" class="small text-danger fw-bold mt-2">TAP TO BROADCAST EMERGENCY</p>
+
+                <form id="emergencyForm" class="text-start mt-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Problem/Description</label>
+                        <textarea id="emergencyDesc" class="form-control" rows="3" placeholder="Describe the medical condition (e.g. Chest pain, Accident)..."></textarea>
+                    </div>
+                    <button type="button" onclick="triggerSOS()" class="btn btn-danger w-100 fw-bold py-2 shadow-sm">SEND TO NEARBY HOSPITALS</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile" class="content-section">
+        <div class="p-4">
+            <h4 class="fw-bold"><i class="fa fa-user-circle text-success"></i> My Account</h4>
+            <hr>
+            <div class="card card-custom p-4 shadow-sm">
+                <div class="text-center mb-4">
+                    <div class="bg-light rounded-circle d-inline-block p-3 mb-2" style="width: 80px; height: 80px;">
+                        <i class="fa fa-user fa-3x text-warning"></i>
+                    </div>
+                    <h5 class="fw-bold">{{ user.patient_name }}</h5>
+                    <span class="badge bg-success">Verified Account</span>
+                </div>
+
+                <form id="profileForm">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Patient ID</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.user_id }}" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Aadhar Number</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.aadhar_no }}" readonly>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Full Name</label>
+                        <input type="text" id="new_name" class="form-control" value="{{ user.patient_name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Email Address</label>
+                        <input type="email" id="new_email" class="form-control" value="{{ user.email }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Phone Number</label>
+                        <input type="text" id="new_phone" class="form-control" value="{{ user.phone or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Gender</label>
+                        <select id="new_gender" class="form-select">
+                            <option value="Male" {% if user.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if user.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if user.gender == 'Other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mt-4 p-3 bg-light rounded-3">
+                        <h6 class="fw-bold text-primary"><i class="fa fa-notes-medical"></i> Medical & Insurance</h6>
+                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Medical History (Allergies/Diseases)</label>
+                            <textarea id="new_history" class="form-control" placeholder="E.g. Diabetes, Penicillin Allergy...">{{ user.medical_history or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Blood Group</label>
+                            <select id="new_blood" class="form-select">
+                                <option value="">Select</option>
+                                <option value="A+" {% if user.blood_group == 'A+' %}selected{% endif %}>A+</option>
+                                <option value="A-" {% if user.blood_group == 'A-' %}selected{% endif %}>A-</option>
+                                <option value="B+" {% if user.blood_group == 'B+' %}selected{% endif %}>B+</option>
+                                <option value="B-" {% if user.blood_group == 'B-' %}selected{% endif %}>B-</option>
+                                <option value="O+" {% if user.blood_group == 'O+' %}selected{% endif %}>O+</option>
+                                <option value="O-" {% if user.blood_group == 'O-' %}selected{% endif %}>O-</option>
+                                <option value="AB+" {% if user.blood_group == 'AB+' %}selected{% endif %}>AB+</option>
+                                <option value="AB-" {% if user.blood_group == 'AB-' %}selected{% endif %}>AB-</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Insurance ID / Policy No.</label>
+                            <input type="text" id="new_insurance" class="form-control" value="{{ user.insurance_no or '' }}" placeholder="Insurance Number">
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="requestUpdateOTP()" class="btn btn-dark w-100 btn-sm fw-bold py-2 mt-3">Verify & Update Profile</button>
+                </form>
+
+                <hr class="my-4">
+                <a href="{{ url_for('auth_bp.logout') }}" class="btn btn-outline-danger w-100 fw-bold">
+                    <i class="fa fa-power-off me-2"></i> EXIT / LOGOUT
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="otpOverlay">
+        <div class="otp-box shadow-lg">
+            <h5 class="fw-bold">Security Verification</h5>
+            <p class="small text-muted">Aapki email par 4-digit OTP bheja gaya hai.</p>
+            <input type="text" id="p_otp_code" class="form-control text-center mb-3" placeholder="0 0 0 0" style="font-size: 24px; letter-spacing: 8px; font-weight: bold;">
+            <button onclick="verifyPatientUpdate()" class="btn btn-success w-100 mb-2 py-2 fw-bold">Confirm & Save Changes</button>
+            <button onclick="document.getElementById('otpOverlay').style.display='none'" class="btn btn-link text-muted btn-sm">Cancel</button>
+        </div>
+    </div>
+
+    <div class="nav-bottom">
+        <button onclick="changeTab(this, 'home')" class="nav-item active"><i class="fa fa-home"></i>Home</button>
+        <button onclick="changeTab(this, 'search')" class="nav-item"><i class="fa fa-search"></i>Search</button>
+        <button onclick="changeTab(this, 'request')" class="nav-item"><i class="fa fa-ambulance"></i>Request</button>
+        <button onclick="changeTab(this, 'profile')" class="nav-item"><i class="fa fa-user"></i>Profile</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- LOGIC: MAP, DISTANCE & ETA ---
+        let responsePoller = null;
+        let map = null;
+        let markers = {}; 
+
+        // Haversine Formula for Distance Calculation
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of Earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1); // Return distance in KM
+        }
+
+        // Logic for Estimated Time (ETA)
+        function calculateETA(distance) {
+            const avgSpeedAmbulance = 40; // 40 km/h average
+            const timeInMinutes = Math.round((distance / avgSpeedAmbulance) * 60);
+            return timeInMinutes + 5; // Adding 5 mins buffer for traffic
+        }
+
+        function initMap(lat, lng) {
+            if (map) return;
+            document.getElementById('sosMap').style.display = 'block';
+            map = L.map('sosMap').setView([lat, lng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.marker([lat, lng]).addTo(map).bindPopup("<b>Aapki Location</b>").openPopup();
+        }
+
+        function startResponsePolling(sosId, userLat, userLng) {
+            if(responsePoller) clearInterval(responsePoller);
+            if(userLat && userLng) initMap(userLat, userLng);
+            
+            responsePoller = setInterval(() => {
+                fetch(`/patient/get_sos_responses?sos_id=${sosId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.responses && data.responses.length > 0) {
+                        const area = document.getElementById('liveResponseArea');
+                        const list = document.getElementById('responseList');
+                        area.style.display = 'block';
+                        list.innerHTML = '';
+                        
+                        data.responses.forEach(resp => {
+                            // Calculate Distance & ETA
+                            const dist = calculateDistance(userLat, userLng, resp.latitude, resp.longitude);
+                            const eta = calculateETA(dist);
+
+                            if(map && resp.latitude && resp.longitude && !markers[resp.hospital_id]) {
+                                let hMarker = L.marker([resp.latitude, resp.longitude], {
+                                    icon: L.icon({
+                                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', 
+                                        iconSize: [30, 30]
+                                    })
+                                }).addTo(map)
+                                .bindPopup(`<b>${resp.hospital_name}</b><br>${dist} km away`);
+                                markers[resp.hospital_id] = hMarker;
+                            }
+
+                            list.innerHTML += `
+                                <div class="card card-custom p-3 hospital-response-card shadow-sm mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-hospital text-danger"></i> ${resp.hospital_name}</h6>
+                                        <span class="dist-badge"><i class="fa fa-road"></i> ${dist} KM</span>
+                                    </div>
+                                    <p class="small text-muted mt-2 mb-2">
+                                        <i class="fa fa-clock text-primary"></i> Est. Arrival: <b>${eta} mins</b><br>
+                                        <i class="fa fa-user-md"></i> Specialist: <b>${resp.specialist_name}</b><br>
+                                        <i class="fa fa-bed"></i> Beds Free: <b>${resp.free_beds}</b>
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <button onclick="selectHospital('${sosId}', '${resp.hospital_id}')" class="btn btn-sm btn-dark flex-grow-1 fw-bold">CHOOSE HOSPITAL</button>
+                                        <a href="https://www.google.com/maps/dir/?api=1&destination=${resp.latitude},${resp.longitude}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fa fa-directions"></i></a>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                });
+            }, 3000); 
+        }
+
+        // --- THE REST OF YOUR SCRIPTS (selectHospital, changeTab, searchHospitals, triggerSOS, etc.) ---
+        // Same as provided in your original code snippet...
+        function selectHospital(sosId, hospitalId) {
+            if(confirm("Confirm this hospital? They will be notified immediately.")) {
+                fetch('/patient/confirm_hospital', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sos_id: sosId, hospital_id: hospitalId })
+                })
+                .then(res => res.json())
+                .then(res => {
+                    if(res.status === 'success') {
+                        alert("✅ Hospital Confirmed! Ambulance/Doctor alerted.");
+                        clearInterval(responsePoller);
+                        location.reload();
+                    }
+                });
+            }
+        }
+
+        function changeTab(element, sectionId) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active-section'));
+            document.getElementById(sectionId).classList.add('active-section');
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        function searchHospitals(query) {
+            const box = document.getElementById('suggestionBox');
+            if(query.length < 2) {
+                box.style.display = 'none';
+                return;
+            }
+            fetch(`/patient/search_hospitals?q=${query}`)
+            .then(res => res.json())
+            .then(data => {
+                box.innerHTML = '';
+                if(data.length > 0) {
+                    box.style.display = 'block';
+                    data.forEach(hosp => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        const sourceBadge = hosp.is_live ? '<span class="badge-live"><i class="fa fa-globe"></i> Live</span>' : '<span class="badge bg-primary" style="font-size:9px;">Registered</span>';
+                        div.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="fw-bold text-dark"><i class="fa fa-hospital text-danger"></i> ${hosp.name}</div>
+                                ${sourceBadge}
+                            </div>
+                            <div class="small text-muted">${hosp.address}</div>
+                        `;
+                        div.onclick = () => {
+                            const searchQuery = encodeURIComponent(hosp.name + " " + hosp.address);
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${searchQuery}`, '_blank');
+                        };
+                        box.appendChild(div);
+                    });
+                } else {
+                    box.style.display = 'none';
+                }
+            });
+        }
+
+        function triggerSOS() {
+            const statusText = document.getElementById('sosStatus');
+            const btn = document.getElementById('sosButton');
+            const alertInfo = document.getElementById('sosAlertCount');
+
+            if (confirm("🚨 EMERGENCY! Kya aap nearby 10km ke sabhi hospitals ko alert bhejna chahte hain?")) {
+                statusText.innerText = "CAPTURING LIVE GPS...";
+                btn.style.background = "#ffc107"; 
+                btn.classList.add('pulse-red');
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        statusText.innerText = "FINDING NEARBY HOSPITALS...";
+                        
+                        fetch('/patient/broadcast_emergency', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lat: lat,
+                                lng: lng,
+                                description: document.getElementById('emergencyDesc').value || "Urgent Medical Assistance Needed!"
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(res => {
+                            if(res.status === 'success') {
+                                if(res.found > 0) {
+                                    alert(`✅ SUCCESS! ${res.found} hospitals ko alert bhej diya gaya hai.`);
+                                    statusText.innerText = `WAITING FOR RESPONSES...`;
+                                    alertInfo.innerHTML = `<b class="text-danger"><i class="fa fa-broadcast-tower"></i> Active SOS:</b> Waiting for response from ${res.found} hospitals.`;
+                                    btn.style.background = "#28a745"; 
+                                    changeTab(document.querySelector('.nav-item'), 'home');
+                                    startResponsePolling(res.sos_id, lat, lng);
+                                } else {
+                                    alert("⚠️ FAILED: 10km radius mein koi registered hospital nahi mila.");
+                                    statusText.innerText = "NO HOSPITALS IN 10KM";
+                                    btn.style.background = "#6c757d"; 
+                                    btn.classList.remove('pulse-red');
+                                }
+                            }
+                        })
+                        .catch(err => {
+                            alert("❌ Error: SOS Broadcast fail ho gaya.");
+                            statusText.innerText = "SYSTEM ERROR";
+                        });
+                    }, (error) => {
+                        alert("GPS on karo bhai!");
+                    }, { enableHighAccuracy: true });
+                }
+            }
+        }
+
+        function requestUpdateOTP() {
+            const data = {
+                name: document.getElementById('new_name').value,
+                email: document.getElementById('new_email').value,
+                phone: document.getElementById('new_phone').value,
+                gender: document.getElementById('new_gender').value,
+                medical_history: document.getElementById('new_history').value,
+                blood_group: document.getElementById('new_blood').value,
+                insurance_no: document.getElementById('new_insurance').value
+            };
+            fetch('/patient/request_update_otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'sent') document.getElementById('otpOverlay').style.display = 'flex';
+            });
+        }
+
+        function verifyPatientUpdate() {
+            const otp = document.getElementById('p_otp_code').value;
+            fetch('/patient/verify_update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ otp: otp })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'success') {
+                    alert("Profile updated!");
+                    window.location.reload();
+                } else {
+                    alert("Galat OTP!");
+                }
+            });
+        }
+    </script>
+</body>
+</html>

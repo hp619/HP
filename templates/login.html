@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <style>
+        body { font-family: Arial; background: #f2f2f2; }
+        .card { width: 340px; background: white; padding: 25px; margin: 80px auto; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,0.2); text-align: center; }
+        h2 { margin-bottom: 15px; }
+        .radio-group { display: flex; justify-content: center; margin-bottom: 15px; }
+        .radio-group input { display: none; }
+        .radio-group label { border: 2px solid black; padding: 6px 20px; cursor: pointer; margin: 0 5px; border-radius: 4px; }
+        .radio-group input:checked + label { background: black; color: white; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #e53935; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+        .register-text { margin-top: 15px; font-size: 14px; }
+        .register-text a { text-decoration: none; color: #e53935; font-weight: bold; }
+        /* Flash message style */
+        .alert { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; border: 1px solid #c3e6cb; }
+        
+        /* Forgot Password Link Style */
+        .forgot-link { display: block; text-align: right; font-size: 12px; margin-bottom: 15px; text-decoration: none; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <h2>Login as</h2>
+    <form method="POST">
+        <div class="radio-group">
+            <input type="radio" id="patient" name="user_type" value="patient" checked>
+            <label for="patient">Patient</label>
+
+            <input type="radio" id="hospital" name="user_type" value="hospital">
+            <label for="hospital">Hospital</label>
+        </div>
+
+        <input type="text" name="user_id" placeholder="Enter 10-digit ID" required>
+        <input type="password" name="password" placeholder="Password" required>
+        
+        <a href="/forgot-password" class="forgot-link">Forgot Password?</a>
+
+        <button type="submit">Login</button>
+    </form>
+
+    <div class="register-text">
+        Don't have an account? <br>
+        Register as 
+        <a href="/register/patient">Patient</a> / 
+        <a href="/register/hospital">Hospital</a>
+    </div>
+</div>
+
+</body>
+</html>

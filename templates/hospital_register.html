@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Registration</title>
+    <style>
+        body { font-family: Arial; background: #f2f2f2; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { width: 380px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-bottom: 15px; }
+        input, textarea { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
+        label { font-size: 12px; color: #666; font-weight: bold; }
+        button { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .pass-hint { font-size: 10px; color: #e53935; display: block; margin-top: -5px; margin-bottom: 5px; }
+        #otp-box { display:none; padding:10px; background:#f0fff4; border:1px dashed green; margin-top:10px; }
+        
+        /* Naya Styles GPS button ke liye */
+        .gps-btn { background: #3498db; margin-bottom: 10px; font-size: 12px; padding: 8px; }
+        .gps-status { font-size: 11px; color: #2ecc71; text-align: center; display: block; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>Hospital Register</h2>
+    <form id="hForm">
+        <input type="hidden" id="h_lat" name="lat">
+        <input type="hidden" id="h_lng" name="lng">
+
+        <input type="text" id="h_name" placeholder="Hospital Name" required>
+        
+        <label for="h_date">Establishment Date (When hospital started)</label>
+        <input type="date" id="h_date" required>
+        
+        <textarea id="h_address" placeholder="Hospital Full Address" rows="2" required></textarea>
+        
+        <button type="button" class="gps-btn" onclick="getLocation()">📍 Detect Hospital Location (GPS)</button>
+        <span id="location-msg" class="gps-status"></span>
+
+        <input type="text" id="h_phone" placeholder="Phone Number">
+        
+        <input type="password" id="pass" placeholder="Create Password" required>
+        <span class="pass-hint">Min 8 chars, 1 Number & 1 Symbol (@#$%^&*)</span>
+        
+        <input type="password" id="c_pass" placeholder="Confirm Password" required>
+        
+        <input type="email" id="email" placeholder="Official Email Address" required>
+
+        <div id="otp-box">
+            <span style="font-size:11px; font-weight:bold; color:green;">EMAIL VERIFICATION CODE</span>
+            <input type="text" id="otp_code" placeholder="Enter OTP">
+        </div>
+
+        <button type="button" id="btn" onclick="handle()">Send OTP</button>
+    </form>
+</div>
+
+<script>
+let step = 1;
+
+// Location detect karne ka function
+function getLocation() {
+    const msg = document.getElementById('location-msg');
+    if (navigator.geolocation) {
+        msg.innerText = "Finding location...";
+        navigator.geolocation.getCurrentPosition((position) => {
+            // Hum coordinates save kar rahe hain
+            document.getElementById('h_lat').value = position.coords.latitude;
+            document.getElementById('h_lng').value = position.coords.longitude;
+            msg.innerText = "✅ Location Captured Successfully!";
+            msg.style.color = "green";
+        }, (error) => {
+            msg.innerText = "❌ Error: Please allow location access.";
+            msg.style.color = "red";
+            alert("Location access denied! SOS alert ke liye location zaroori hai.");
+        });
+    } else {
+        alert("Aapka browser GPS support nahi karta.");
+    }
+}
+
+// Page load hote hi location mangne ki koshish karein
+window.onload = getLocation;
+
+function isStrongPassword(password) {
+    const minLength = 8;
+    const hasNumber = /\d/;
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/;
+    
+    if (password.length < minLength) return "Password kam se kam 8 characters ka hona chahiye!";
+    if (!hasNumber.test(password)) return "Password mein kam se kam ek number hona chahiye!";
+    if (!hasSpecialChar.test(password)) return "Password mein kam se kam ek special character hona chahiye!";
+    return true;
+}
+
+function handle() {
+    const p1 = document.getElementById('pass').value;
+    const p2 = document.getElementById('c_pass').value;
+    const email = document.getElementById('email').value;
+    const hDate = document.getElementById('h_date').value;
+    const hName = document.getElementById('h_name').value;
+    const hAddress = document.getElementById('h_address').value;
+    const hLat = document.getElementById('h_lat').value; 
+    const hLng = document.getElementById('h_lng').value;
+    const hPhone = document.getElementById('h_phone').value;
+
+    if(step === 1) {
+        if(!hName || !hDate || !email || !hAddress) { alert("Bhai, saari details bharna zaroori hai!"); return; }
+        
+        if(!hLat || !hLng) {
+            if(!confirm("Location detect nahi hui hai. SOS feature kaam nahi karega. Kya aap bina location ke register karna chahte hain?")) {
+                getLocation();
+                return;
+            }
+        }
+
+        if(p1 !== p2) { alert("Passwords match nahi ho rahe!"); return; }
+
+        const strengthCheck = isStrongPassword(p1);
+        if(strengthCheck !== true) { alert(strengthCheck); return; }
+
+        fetch('/send-otp-only', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                email: email, 
+                password: p1, 
+                confirm_password: p2,
+                role: 'hospital', 
+                hospital_name: hName,
+                address: hAddress,
+                establishment_date: hDate,
+                // NAYA LOGIC: parseFloat use kiya taaki backend ko String nahi Number mile
+                lat: hLat ? parseFloat(hLat) : null, 
+                lng: hLng ? parseFloat(hLng) : null  
+            })
+        }).then(res => {
+            if(res.ok) {
+                document.getElementById('otp-box').style.display = 'block';
+                document.getElementById('btn').innerText = 'Verify & Register';
+                step = 2;
+                alert("OTP bhej diya gaya hai!");
+            } else {
+                alert("Server error! Check karo app.py chal raha hai ya nahi.");
+            }
+        });
+    } else {
+        // Step 2: Verification step
+        fetch('/verify-and-register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                otp: document.getElementById('otp_code').value,
+                email: email,
+                password: p1,
+                role: 'hospital',
+                hospital_name: hName,
+                address: hAddress,
+                establishment_date: hDate,
+                phone: hPhone,
+                // NAYA LOGIC: parseFloat conversion
+                lat: hLat ? parseFloat(hLat) : null,
+                lng: hLng ? parseFloat(hLng) : null
+            })
+        }).then(res => res.ok ? window.location.href='/login' : alert("Galat OTP! Sahi code dalein."));
+    }
+}
+</script>
+</body>
+</html>

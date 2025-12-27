@@ -1,0 +1,18 @@
+Hospital_Emergency_System/
+│
+├── app.py                     # MongoDB Connection + Google API Key Config
+├── requirements.txt           # (Naya: pymongo, requests, python-dotenv)
+│
+├── routes/
+│   ├── auth.py                # Login/Register + 'isVirtual' flag logic
+│   ├── patient.py             # SEARCH LOGIC (Google API + DB Index)
+│   ├── hospital.py            # Emergency Request Receive Logic
+│   └── search.py              # (Naya: Fast suggestions and Google Redirects)
+│
+└── templates/
+    ├── login.html
+    ├── patient_register.html
+    ├── hospital_register.html
+    ├── patient_home.html      # (Upgraded: Search Bar + Real-time results)
+    ├── hospital_home.html     # (Upgraded: 50km Alert Notifications)
+    └── hospital_info.html     # (Naya: Search results display)
