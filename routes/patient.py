@@ -90,7 +90,7 @@ def verify_update():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- 4. SMART SEARCH LOGIC (Updated with CSV & Info Page) ---
+# --- 4. SMART SEARCH LOGIC (Updated to show 2 Lakh CSV Data + Registered) ---
 @patient_bp.route('/search_hospitals', methods=['GET'])
 def search_hospitals():
     from app import db, GOOGLE_MAPS_API_KEY
@@ -98,36 +98,42 @@ def search_hospitals():
     if len(query) < 2:
         return jsonify([])
 
-    # A. Search in Registered Hospitals (Our MongoDB)
+    results = []
+
+    # A. Search in Registered Hospitals (Our App Partners)
+    # Note: Hum 'hospital_name' use kar rahe hain jo registered collection mein hai
     db_results = list(db.hospitals.find({
         "hospital_name": {"$regex": query, "$options": "i"}
     }).limit(5))
 
-    results = []
     for h in db_results:
         results.append({
             "name": h.get('hospital_name'),
-            "address": h.get('address', 'Registered'),
+            "address": h.get('address', 'Registered Partner'),
             "type": "Certified",
             "is_registered": True,
-            "id": h.get('user_id')
+            "id": h.get('user_id') # Dashboard isse Review page par bhejega
         })
 
-    # B. Search in CSV Data (External)
+    # B. Search in External Hospitals (CSV Data - 2 Lakh records)
+    # Note: CSV script mein humne 'hospital_name' hi store kiya tha
     csv_results = list(db.external_hospitals.find({
-        "Facility Name": {"$regex": query, "$options": "i"}
-    }).limit(5))
+        "hospital_name": {"$regex": query, "$options": "i"}
+    }).limit(10))
 
     for c in csv_results:
+        # Lat/Lng extract kar rahe hain taaki Dashboard Google Maps khol sake
+        coords = c.get('location', {}).get('coordinates', [0, 0])
         results.append({
-            "name": c.get('Facility Name'),
-            "address": f"{c.get('State Name')}, {c.get('District Name')}",
+            "name": c.get('hospital_name'),
+            "address": f"{c.get('district', 'N/A')}, {c.get('state', 'N/A')}",
             "type": "Govt/Public",
             "is_registered": False,
-            "google_search": True
+            "lat": coords[1],
+            "lng": coords[0]
         })
 
-    # C. Google Maps Search (Original Logic Kept)
+    # C. Google Maps Search (Optional Backup)
     try:
         google_url = f"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={query}&types=establishment&location=20.5937,78.9629&radius=2000000&key={GOOGLE_MAPS_API_KEY}"
         response = requests.get(google_url).json()
@@ -149,7 +155,7 @@ def search_hospitals():
 
     return jsonify(results)
 
-# --- 5. HOSPITAL INFO PAGE (New Route for Real Rating) ---
+# --- 5. HOSPITAL INFO PAGE (Real Rating) ---
 @patient_bp.route('/hospital-info/<hos_id>')
 def hospital_info(hos_id):
     from app import db
@@ -157,18 +163,18 @@ def hospital_info(hos_id):
     if not hospital:
         return "Hospital Not Found", 404
 
-    # Rating logic: Calculate real average or default to 0 (HTML will show 5)
+    # Reviews se real average rating nikalna
     reviews = list(db.reviews.find({"hospital_id": hos_id}))
     if reviews:
         avg_rating = sum([r['rating'] for r in reviews]) / len(reviews)
         review_count = len(reviews)
     else:
-        avg_rating = 0
+        avg_rating = 5.0 # Naye hospital ke liye default 5 star
         review_count = 0
 
     return render_template('hospital_info.html', hospital=hospital, avg_rating=round(avg_rating, 1), review_count=review_count)
 
-# --- 6. POLLING & SOS LOGIC (Original - DO NOT REMOVE) ---
+# --- 6. POLLING & SOS LOGIC (Original) ---
 @patient_bp.route('/get_sos_responses', methods=['GET'])
 def get_live_responses():
     from app import db
@@ -226,6 +232,7 @@ def broadcast_emergency():
         }
         db.emergency_requests.insert_one(sos_entry)
 
+        # Registered Hospitals search logic based on Location
         nearby_hospitals = list(db.hospitals.find({
             "location": {
                 "$nearSphere": {
