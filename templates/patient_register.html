@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patient Registration</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { width: 400px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { width: 100%; max-width: 400px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; outline: none; transition: 0.3s; }
+        input:focus { border-color: #3498db; }
         .row { display: flex; gap: 10px; }
         button { width: 100%; padding: 12px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; margin-top: 10px; }
-        button:hover { background: #2980b9; }
+        button:hover:not(:disabled) { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
         #otp-section { display: none; margin-top: 15px; padding: 15px; background: #e8f4fd; border: 1px dashed #3498db; border-radius: 8px; }
         .pass-hint { font-size: 10px; color: #e53935; margin-top: -5px; margin-bottom: 5px; display: block; }
     </style>
@@ -41,6 +43,7 @@
         <input type="email" id="email" placeholder="Email Address" required>
 
         <div id="otp-section">
+            <span style="font-size:12px; font-weight:bold; color:#3498db; display:block; margin-bottom:5px;">OTP VERIFICATION</span>
             <input type="text" id="otp_input" placeholder="Enter 4-digit OTP">
         </div>
 
@@ -50,68 +53,121 @@
 
 <script>
 let currentStep = 1;
+let cooldown = false;
 
-// --- 🛡️ Password Strength Checker ---
+function startTimer(seconds) {
+    cooldown = true;
+    const btn = document.getElementById('actionBtn');
+    let timeLeft = seconds;
+    
+    const timer = setInterval(() => {
+        if (currentStep === 1) {
+            btn.disabled = true;
+            btn.innerText = `Wait ${timeLeft}s`;
+            timeLeft--;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.innerText = "Send OTP";
+                cooldown = false;
+            }
+        } else {
+            clearInterval(timer); // Agar step 2 ho gaya toh timer rok do
+        }
+    }, 1000);
+}
+
 function isStrongPassword(password) {
     const minLength = 8;
     const hasNumber = /\d/;
     const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/;
     
     if (password.length < minLength) return "Password kam se kam 8 digit ka hona chahiye!";
-    if (!hasNumber.test(password)) return "Password mein kam se kam ek number hona chahiye!";
-    if (!hasSpecialChar.test(password)) return "Password mein kam se kam ek special character (e.g. @, #, $) hona chahiye!";
+    if (!hasNumber.test(password)) return "Password mein ek number hona chahiye!";
+    if (!hasSpecialChar.test(password)) return "Password mein ek special character hona chahiye!";
     return true;
 }
 
 function handleRegistration() {
+    const btn = document.getElementById('actionBtn');
     const pass = document.getElementById('password').value;
     const cPass = document.getElementById('confirm_password').value;
     const email = document.getElementById('email').value;
+    const aadhar = document.getElementById('p_aadhar').value;
+    const name = document.getElementById('p_name').value;
 
     if (currentStep === 1) {
-        // Password matching check
-        if (pass !== cPass) {
-            alert("Passwords match nahi ho rahe!");
-            return;
-        }
-
-        // Strength check call
+        // Validation Checks
+        if (!name || !aadhar || !email) { alert("Sari details bharna zaruri hai!"); return; }
+        if (aadhar.length !== 12) { alert("Aadhar number 12 digits ka hona chahiye!"); return; }
+        if (pass !== cPass) { alert("Passwords match nahi ho rahe!"); return; }
+        
         const strengthCheck = isStrongPassword(pass);
-        if (strengthCheck !== true) {
-            alert(strengthCheck);
-            return;
-        }
+        if (strengthCheck !== true) { alert(strengthCheck); return; }
+
+        // Button Lock
+        btn.disabled = true;
+        btn.innerText = "Processing...";
 
         fetch('/send-otp-only', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                email: email, password: pass, confirm_password: cPass,
-                role: 'patient', patient_name: document.getElementById('p_name').value,
-                aadhar: document.getElementById('p_aadhar').value
+                email: email, 
+                password: pass, 
+                confirm_password: cPass,
+                role: 'patient', 
+                patient_name: name,
+                aadhar_card: aadhar, // Backend naming match
+                age: document.getElementById('p_age').value,
+                gender: document.getElementById('p_gender').value
+            })
+        })
+        .then(async response => {
+            const result = await response.json();
+            if (response.ok) {
+                document.getElementById('otp-section').style.display = 'block';
+                btn.innerText = 'Verify & Register';
+                btn.disabled = false;
+                currentStep = 2;
+                alert("OTP Sent Successfully!");
+            } else {
+                // Backend se aane wale unique error (Aadhar/Email limit) yahan dikhenge
+                alert(result.message || "Registration Error!");
+                btn.disabled = false;
+                btn.innerText = "Send OTP";
+            }
+        })
+        .catch(err => {
+            alert("Server Error! Check your connection.");
+            btn.disabled = false;
+            btn.innerText = "Send OTP";
+        });
+
+    } else {
+        // Step 2: Verification
+        const otpValue = document.getElementById('otp_input').value;
+        btn.disabled = true;
+        btn.innerText = "Verifying...";
+
+        fetch('/verify-and-register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                otp: otpValue,
+                email: email,
+                aadhar_card: aadhar,
+                role: 'patient'
             })
         })
         .then(response => {
             if (response.ok) {
-                document.getElementById('otp-section').style.display = 'block';
-                document.getElementById('actionBtn').innerText = 'Verify & Register';
-                currentStep = 2;
-                alert("OTP Sent!");
-            }
-        });
-    } else {
-        const otpValue = document.getElementById('otp_input').value;
-        fetch('/verify-and-register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp: otpValue })
-        })
-        .then(response => {
-            if (response.ok) {
-                alert("Success!");
+                alert("Registration Successful!");
                 window.location.href = '/login';
             } else {
-                alert("Galat OTP!");
+                alert("Galat OTP! Dobara koshish karein.");
+                btn.disabled = false;
+                btn.innerText = "Verify & Register";
             }
         });
     }
