@@ -17,13 +17,15 @@ jobs:
         run: |
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-          # Agar ek baar network fail ho toh ye automatically 3 baar try karega
+          # Agar network error aaye toh ye automatically 3 baar retry karega
           ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug
         env:
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
+          # Flask apps ke liye compile karte waqt ye safety flag zaroori hai
+          P4A_RELEASE_KEYALIAS: "1"
 
       - name: Upload APK
-        # Jab build success hoga, tab ye file save karega
+        # Ye step tabhi chalega jab build success hoga
         if: success()
         uses: actions/upload-artifact@v4
         with:
