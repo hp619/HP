@@ -15,5 +15,5 @@ jobs:
 
       - name: Build APK with Buildozer
         run: |
-          # Is command se Buildozer direct chalega bina kisi external action ke
-          ~/.local/bin/buildozer -v android debug
+          # 'yes |' lagane se saare licenses apne aap 'y' (yes) ho jayenge
+          yes | ~/.local/bin/buildozer -v android debug
