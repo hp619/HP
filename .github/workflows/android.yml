@@ -3,7 +3,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Ye version Buildozer ke liye sabse best hai
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -15,12 +15,16 @@ jobs:
 
       - name: Build APK
         run: |
-          # Licenses accept karne ka automatic aur silent tareeka
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-          # Buildozer ko direct chalao
-          ~/.local/bin/buildozer -v android debug
+          # 'yes |' safety ke liye rakha hai
+          yes | ~/.local/bin/buildozer -v android debug
         env:
-          # Isse licenses apne aap accept ho jayenge
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
 
+      - name: Upload APK
+        # Ye step build hone ke baad APK ko download ke liye ready rakhega
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-flask-app-apk
+          path: bin/*.apk
