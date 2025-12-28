@@ -17,13 +17,14 @@ jobs:
         run: |
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-          # 'yes |' safety ke liye rakha hai
-          yes | ~/.local/bin/buildozer -v android debug
+          # Agar ek baar network fail ho toh ye automatically 3 baar try karega
+          ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug
         env:
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
 
       - name: Upload APK
-        # Ye step build hone ke baad APK ko download ke liye ready rakhega
+        # Jab build success hoga, tab ye file save karega
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: my-flask-app-apk
