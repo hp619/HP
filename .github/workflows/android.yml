@@ -7,10 +7,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Isse purana build save rahega aur next time 5 min mein khatam hoga
       - name: Cache Buildozer
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: .buildozer
+          path: |
+            ~/.buildozer
+            .buildozer
           key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
       - name: Install Dependencies
@@ -23,8 +26,8 @@ jobs:
         run: |
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-          # Buildozer ko direct aur retry ke sath
-          ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug
+          # Sirf ek baar run karenge kyunki cache enable hai
+          ~/.local/bin/buildozer -v android debug
         env:
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
           P4A_RELEASE_KEYALIAS: "1"
@@ -33,5 +36,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: my-flask-app-apk
+          name: Build-APK
           path: bin/*.apk
