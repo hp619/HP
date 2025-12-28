@@ -1,19 +1,26 @@
-name: Build Android APK
+namename: Build Android APK
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Ye version Buildozer ke liye sabse best hai
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Buildozer Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt update
           sudo apt install -y python3-pip build-essential git python3 python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
           pip3 install --user --upgrade buildozer Cython==0.29.33 virtualenv
 
-      - name: Build APK with Buildozer
+      - name: Build APK
         run: |
-          # 'yes |' lagane se saare licenses apne aap 'y' (yes) ho jayenge
-          yes | ~/.local/bin/buildozer -v android debug
+          # Licenses accept karne ka automatic aur silent tareeka
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          # Buildozer ko direct chalao
+          ~/.local/bin/buildozer -v android debug
+        env:
+          # Isse licenses apne aap accept ho jayenge
+          APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
+
