@@ -7,25 +7,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Buildozer
+        uses: actions/cache@v3
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3-pip build-essential git python3 python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
+          sudo apt install -y python3-pip build-essential git python3 python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev autoconf automake libtool pkg-config
           pip3 install --user --upgrade buildozer Cython==0.29.33 virtualenv
 
       - name: Build APK
         run: |
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-          # Agar network error aaye toh ye automatically 3 baar retry karega
-          ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug
+          # Buildozer ko direct aur retry ke sath
+          ~/.local/bin/buildozer -v android debug || ~/.local/bin/buildozer -v android debug
         env:
           APP_ANDROID_ACCEPT_SDK_LICENSE: "1"
-          # Flask apps ke liye compile karte waqt ye safety flag zaroori hai
           P4A_RELEASE_KEYALIAS: "1"
 
       - name: Upload APK
-        # Ye step tabhi chalega jab build success hoga
         if: success()
         uses: actions/upload-artifact@v4
         with:
